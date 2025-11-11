@@ -1,0 +1,18 @@
+<div class="container">
+  <header>
+    <h2>Eventos</h2>
+    <a routerLink="/eventos/novo">Novo</a>
+  </header>
+
+  <ul>
+    <li *ngFor="let e of (eventos$ | async)">
+      <strong>{{ e.nome }}</strong>
+      <div>{{ e.descricao }}</div>
+      <small>{{ e.latitude }}, {{ e.longitude }}</small>
+      <div class="acoes">
+        <a [routerLink]="['/eventos', e.id]">Editar</a>
+        <button (click)="remover(e.id)">Remover</button>
+      </div>
+    </li>
+  </ul>
+</div>
