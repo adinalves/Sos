@@ -8,7 +8,6 @@ import {
   PLATFORM_ID
 } from '@angular/core';
 import { CommonModule, isPlatformBrowser, DatePipe } from '@angular/common';
-import { RouterLink } from '@angular/router';
 import type * as LType from 'leaflet';
 
 // Conditional import - only import Leaflet in browser
@@ -100,15 +99,11 @@ interface MapEvento extends Evento {
 @Component({
   selector: 'app-mapa',
   standalone: true,
-  imports: [CommonModule, DatePipe, RouterLink],
+  imports: [CommonModule, DatePipe],
   template: `
     <div class="wrap">
       <header class="topbar">
         <div class="title">🗺️ 🛡️ Sistema Integrador </div>
-        <div class="actions">
-          <a routerLink="/config" class="btn-config">⚙️ Configuração</a>
-          <button (click)="clearAll()">Limpar</button>
-        </div>
       </header>
 
       <!-- Sidebar de eventos -->
@@ -150,11 +145,6 @@ interface MapEvento extends Evento {
       display:flex; align-items:center; justify-content:space-between; gap:12px;
     }
     .title { font-weight:700; }
-    .actions { display:flex; align-items:center; gap:8px; }
-    .actions button, .actions a { margin-left:8px; padding:6px 10px; border-radius:8px; border:0; cursor:pointer; text-decoration:none; color:#fff; background:#475569; }
-    .actions button:hover, .actions a:hover { background:#64748b; }
-    .actions button:disabled { opacity:.6; cursor:not-allowed; }
-    .btn-config { display:inline-block; }
 
     .map { flex:1 1 auto; width:100%; }
 
@@ -341,13 +331,6 @@ export class MapaComponent implements AfterViewInit, OnDestroy, OnInit {
     if (this.eventSubscription) {
       this.eventSubscription.unsubscribe();
     }
-  }
-
-  clearAll() {
-    this.pmLayer.clearLayers();
-    this.ebLayer.clearLayers();
-    this.markerById.clear();
-    this.events = [];
   }
 
   // Update events from service
