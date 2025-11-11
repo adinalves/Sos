@@ -12,6 +12,7 @@ import { randomUUID } from 'crypto';
 
 const browserDistFolder = join(import.meta.dirname, '../browser');
 const configFilePath = join(import.meta.dirname, '../server-config.json');
+const mapeamentoFilePath = join(import.meta.dirname, '../server-mapeamento.json');
 
 const app = express();
 const angularApp = new AngularNodeAppEngine();
@@ -38,11 +39,48 @@ interface ServerConfig {
   ipPMERJ: string;
 }
 
+// Field mapping interface
+interface FieldMapping {
+  id?: string;
+  nome: string;
+  descricao?: string;
+  latitude: string;
+  longitude: string;
+  ts?: string;
+}
+
+interface MapeamentoConfig {
+  army: FieldMapping;
+  pmerj: FieldMapping;
+}
+
 // Default configuration
 let serverConfig: ServerConfig = {
   ipArmy: 'ip_army',
   ipPMERJ: 'ip_pmerj'
 };
+
+// Default field mapping
+const defaultMapeamento: MapeamentoConfig = {
+  army: {
+    id: 'identificador',
+    nome: 'titulo',
+    descricao: 'detalhes',
+    latitude: 'lat',
+    longitude: 'lng',
+    ts: 'dataHora'
+  },
+  pmerj: {
+    id: 'codigo',
+    nome: 'name',
+    descricao: 'description',
+    latitude: 'lat',
+    longitude: 'lon',
+    ts: 'timestamp'
+  }
+};
+
+let mapeamentoConfig: MapeamentoConfig = { ...defaultMapeamento };
 
 // Load configuration from file if it exists
 async function loadConfig(): Promise<void> {
@@ -65,8 +103,74 @@ async function saveConfig(): Promise<void> {
   }
 }
 
+// Load mapeamento from file if it exists
+async function loadMapeamento(): Promise<void> {
+  try {
+    if (existsSync(mapeamentoFilePath)) {
+      const data = await readFile(mapeamentoFilePath, 'utf-8');
+      mapeamentoConfig = { ...defaultMapeamento, ...JSON.parse(data) };
+    }
+  } catch (error) {
+    console.error('Error loading mapeamento:', error);
+  }
+}
+
+// Save mapeamento to file
+async function saveMapeamento(): Promise<void> {
+  try {
+    await writeFile(mapeamentoFilePath, JSON.stringify(mapeamentoConfig, null, 2), 'utf-8');
+  } catch (error) {
+    console.error('Error saving mapeamento:', error);
+  }
+}
+
+// Apply field mapping to incoming data
+function applyMapping(data: any, mapping: FieldMapping): any {
+  const result: any = {};
+  
+  if (mapping.id && data[mapping.id] !== undefined) {
+    result.id = String(data[mapping.id]);
+  }
+  
+  if (mapping.nome && data[mapping.nome] !== undefined) {
+    result.nome = String(data[mapping.nome]);
+  }
+  
+  if (mapping.descricao && data[mapping.descricao] !== undefined) {
+    result.descricao = String(data[mapping.descricao]);
+  } else {
+    result.descricao = '';
+  }
+  
+  if (mapping.latitude && data[mapping.latitude] !== undefined) {
+    result.latitude = Number(data[mapping.latitude]);
+  }
+  
+  if (mapping.longitude && data[mapping.longitude] !== undefined) {
+    result.longitude = Number(data[mapping.longitude]);
+  }
+  
+  if (mapping.ts && data[mapping.ts] !== undefined) {
+    const tsValue = data[mapping.ts];
+    // Try to parse as number or date
+    if (typeof tsValue === 'number') {
+      result.ts = tsValue;
+    } else if (typeof tsValue === 'string') {
+      const parsed = Date.parse(tsValue);
+      result.ts = isNaN(parsed) ? Date.now() : parsed;
+    } else {
+      result.ts = Date.now();
+    }
+  } else {
+    result.ts = Date.now();
+  }
+  
+  return result;
+}
+
 // Initialize config on startup
 loadConfig();
+loadMapeamento();
 
 /**
  * CORS middleware for API routes (must be before API routes)
@@ -110,24 +214,70 @@ app.post('/api/config', async (req, res) => {
   }
 });
 
+// Get mapeamento configuration
+app.get('/api/mapeamento', (req, res) => {
+  res.json(mapeamentoConfig);
+});
+
+// Update mapeamento configuration
+app.post('/api/mapeamento', async (req, res) => {
+  try {
+    const newMapeamento = req.body as MapeamentoConfig;
+    
+    // Validate required fields
+    if (!newMapeamento.army || !newMapeamento.pmerj) {
+      res.status(400).json({ error: 'Missing army or pmerj mapping' });
+      return;
+    }
+    
+    if (!newMapeamento.army.nome || !newMapeamento.army.latitude || !newMapeamento.army.longitude) {
+      res.status(400).json({ error: 'Missing required fields in army mapping: nome, latitude, longitude' });
+      return;
+    }
+    
+    if (!newMapeamento.pmerj.nome || !newMapeamento.pmerj.latitude || !newMapeamento.pmerj.longitude) {
+      res.status(400).json({ error: 'Missing required fields in pmerj mapping: nome, latitude, longitude' });
+      return;
+    }
+    
+    mapeamentoConfig = { ...newMapeamento };
+    await saveMapeamento();
+    res.json(mapeamentoConfig);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update mapeamento' });
+  }
+});
+
 // Receive events from Army server
 app.post('/api/eventos/army', (req, res): void => {
   try {
-    const { nome, descricao, latitude, longitude } = req.body;
+    console.log(`[SERVER] Received POST /api/eventos/army`);
+    console.log(`[SERVER] Request body (JSON):`);
+    console.log(JSON.stringify(req.body, null, 2));
     
-    if (!nome || latitude === undefined || longitude === undefined) {
-      res.status(400).json({ error: 'Missing required fields: nome, latitude, longitude' });
+    // Apply field mapping
+    const mapped = applyMapping(req.body, mapeamentoConfig.army);
+    
+    console.log(`[SERVER] After mapping (JSON):`);
+    console.log(JSON.stringify(mapped, null, 2));
+    
+    if (!mapped.nome || mapped.latitude === undefined || mapped.longitude === undefined) {
+      const errorResponse = { 
+        error: `Missing required fields. Expected: nome (${mapeamentoConfig.army.nome}), latitude (${mapeamentoConfig.army.latitude}), longitude (${mapeamentoConfig.army.longitude})` 
+      };
+      console.error(`[SERVER] Validation error:`, errorResponse);
+      res.status(400).json(errorResponse);
       return;
     }
 
     const evento: ServerEvento = {
-      id: randomUUID(),
+      id: mapped.id || randomUUID(),
       forca: 'EB',
-      nome,
-      descricao: descricao || '',
-      latitude: Number(latitude),
-      longitude: Number(longitude),
-      ts: Date.now()
+      nome: mapped.nome,
+      descricao: mapped.descricao || '',
+      latitude: mapped.latitude,
+      longitude: mapped.longitude,
+      ts: mapped.ts || Date.now()
     };
 
     eventos.push(evento);
@@ -137,9 +287,11 @@ app.post('/api/eventos/army', (req, res): void => {
       eventos.shift();
     }
 
-    console.log(`Received event from Army: ${evento.nome} at ${evento.latitude}, ${evento.longitude}`);
-    res.status(201).json(evento);
+    console.log(`[SERVER] ✓ Event processed: ${evento.nome} at ${evento.latitude}, ${evento.longitude}`);
+    
+    res.status(201).json({ success: true, message: 'Event received successfully' });
   } catch (error) {
+    console.error('[SERVER] ✗ Error processing Army event:', error);
     res.status(500).json({ error: 'Failed to process event' });
   }
 });
@@ -147,21 +299,33 @@ app.post('/api/eventos/army', (req, res): void => {
 // Receive events from PMERJ server
 app.post('/api/eventos/pmerj', (req, res): void => {
   try {
-    const { nome, descricao, latitude, longitude } = req.body;
+    console.log(`[SERVER] Received POST /api/eventos/pmerj`);
+    console.log(`[SERVER] Request body (JSON):`);
+    console.log(JSON.stringify(req.body, null, 2));
     
-    if (!nome || latitude === undefined || longitude === undefined) {
-      res.status(400).json({ error: 'Missing required fields: nome, latitude, longitude' });
+    // Apply field mapping
+    const mapped = applyMapping(req.body, mapeamentoConfig.pmerj);
+    
+    console.log(`[SERVER] After mapping (JSON):`);
+    console.log(JSON.stringify(mapped, null, 2));
+    
+    if (!mapped.nome || mapped.latitude === undefined || mapped.longitude === undefined) {
+      const errorResponse = { 
+        error: `Missing required fields. Expected: nome (${mapeamentoConfig.pmerj.nome}), latitude (${mapeamentoConfig.pmerj.latitude}), longitude (${mapeamentoConfig.pmerj.longitude})` 
+      };
+      console.error(`[SERVER] Validation error:`, errorResponse);
+      res.status(400).json(errorResponse);
       return;
     }
 
     const evento: ServerEvento = {
-      id: randomUUID(),
+      id: mapped.id || randomUUID(),
       forca: 'PMERJ',
-      nome,
-      descricao: descricao || '',
-      latitude: Number(latitude),
-      longitude: Number(longitude),
-      ts: Date.now()
+      nome: mapped.nome,
+      descricao: mapped.descricao || '',
+      latitude: mapped.latitude,
+      longitude: mapped.longitude,
+      ts: mapped.ts || Date.now()
     };
 
     eventos.push(evento);
@@ -171,9 +335,11 @@ app.post('/api/eventos/pmerj', (req, res): void => {
       eventos.shift();
     }
 
-    console.log(`Received event from PMERJ: ${evento.nome} at ${evento.latitude}, ${evento.longitude}`);
-    res.status(201).json(evento);
+    console.log(`[SERVER] ✓ Event processed: ${evento.nome} at ${evento.latitude}, ${evento.longitude}`);
+    
+    res.status(201).json({ success: true, message: 'Event received successfully' });
   } catch (error) {
+    console.error('[SERVER] ✗ Error processing PMERJ event:', error);
     res.status(500).json({ error: 'Failed to process event' });
   }
 });

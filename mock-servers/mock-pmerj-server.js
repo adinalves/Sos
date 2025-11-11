@@ -9,57 +9,57 @@ const http = require('http');
 const TARGET_HOST = 'localhost';
 const TARGET_PORT = 4000;
 const TARGET_PATH = '/api/eventos/pmerj';
-const INTERVAL_MS = 2500; // Send event every 2.5 seconds
+const INTERVAL_MS = 30000; // Send event every 30 seconds
 
 // Event templates for PMERJ
 const eventTemplates = [
   {
-    nome: 'Patrulhamento de rotina',
-    descricao: 'Equipe da PMERJ realiza patrulhamento preventivo na região, com foco em dissuadir práticas criminosas.',
-    latitude: -22.9068,
-    longitude: -43.1729
+    name: 'Patrulhamento de rotina',
+    description: 'Equipe da PMERJ realiza patrulhamento preventivo na região, com foco em dissuadir práticas criminosas.',
+    lat: -22.9068,
+    lon: -43.1729
   },
   {
-    nome: 'Ocorrência em andamento',
-    descricao: 'Policiamento ostensivo em resposta a denúncia de atividade suspeita.',
-    latitude: -22.9100,
-    longitude: -43.1800
+    name: 'Ocorrência em andamento',
+    description: 'Policiamento ostensivo em resposta a denúncia de atividade suspeita.',
+    lat: -22.9100,
+    lon: -43.1800
   },
   {
-    nome: 'Fiscalização de trânsito',
-    descricao: 'Fiscalização de veículos e motocicletas para coibir infrações e identificar irregularidades.',
-    latitude: -22.9000,
-    longitude: -43.1700
+    name: 'Fiscalização de trânsito',
+    description: 'Fiscalização de veículos e motocicletas para coibir infrações e identificar irregularidades.',
+    lat: -22.9000,
+    lon: -43.1700
   },
   {
-    nome: 'Abordagem de suspeitos',
-    descricao: 'Abordagem de indivíduos em atitude suspeita para verificação de antecedentes.',
-    latitude: -22.9200,
-    longitude: -43.1750
+    name: 'Abordagem de suspeitos',
+    description: 'Abordagem de indivíduos em atitude suspeita para verificação de antecedentes.',
+    lat: -22.9200,
+    lon: -43.1750
   },
   {
-    nome: 'Operação de bloqueio',
-    descricao: 'Operação de bloqueio viário com revista aleatória de veículos.',
-    latitude: -22.9150,
-    longitude: -43.1650
+    name: 'Operação de bloqueio',
+    description: 'Operação de bloqueio viário com revista aleatória de veículos.',
+    lat: -22.9150,
+    lon: -43.1650
   },
   {
-    nome: 'Ronda escolar',
-    descricao: 'Ronda escolar garantindo segurança no entorno de instituição de ensino.',
-    latitude: -22.9050,
-    longitude: -43.1850
+    name: 'Ronda escolar',
+    description: 'Ronda escolar garantindo segurança no entorno de instituição de ensino.',
+    lat: -22.9050,
+    lon: -43.1850
   },
   {
-    nome: 'Monitoramento de aglomeração',
-    descricao: 'Monitoramento de pontos de aglomeração para manter a ordem pública.',
-    latitude: -22.9250,
-    longitude: -43.1600
+    name: 'Monitoramento de aglomeração',
+    description: 'Monitoramento de pontos de aglomeração para manter a ordem pública.',
+    lat: -22.9250,
+    lon: -43.1600
   },
   {
-    nome: 'Suporte a evento público',
-    descricao: 'Atuação preventiva em apoio à realização de evento público.',
-    latitude: -22.8950,
-    longitude: -43.1750
+    name: 'Suporte a evento público',
+    description: 'Atuação preventiva em apoio à realização de evento público.',
+    lat: -22.8950,
+    lon: -43.1750
   }
 ];
 
@@ -67,19 +67,25 @@ const eventTemplates = [
 function generateEvent() {
   const template = eventTemplates[Math.floor(Math.random() * eventTemplates.length)];
   const variation = 0.01; // Small variation in coordinates
+  const codigo = 'PMERJ-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
   
   return {
-    nome: template.nome,
-    descricao: template.descricao,
-    latitude: template.latitude + (Math.random() - 0.5) * variation,
-    longitude: template.longitude + (Math.random() - 0.5) * variation
+    codigo: codigo,
+    name: template.name,
+    description: template.description,
+    lat: template.lat + (Math.random() - 0.5) * variation,
+    lon: template.lon + (Math.random() - 0.5) * variation,
+    timestamp: Date.now()
   };
 }
 
 // Send event to main server
 function sendEvent() {
   const event = generateEvent();
-  const data = JSON.stringify(event);
+  const data = JSON.stringify(event, null, 2);
+
+  console.log(`[PMERJ] Sending event (JSON):`);
+  console.log(JSON.stringify(event, null, 2));
 
   const options = {
     hostname: TARGET_HOST,
@@ -101,9 +107,9 @@ function sendEvent() {
 
     res.on('end', () => {
       if (res.statusCode === 201) {
-        console.log(`[PMERJ] Event sent successfully: ${event.nome} at ${event.latitude.toFixed(5)}, ${event.longitude.toFixed(5)}`);
+        console.log(`[PMERJ] ✓ Event sent successfully: ${event.name} at ${event.lat.toFixed(5)}, ${event.lon.toFixed(5)}`);
       } else {
-        console.error(`[PMERJ] Error sending event: ${res.statusCode} - ${responseData}`);
+        console.error(`[PMERJ] ✗ Error sending event: ${res.statusCode} - ${responseData}`);
       }
     });
   });

@@ -8,6 +8,7 @@ import {
   PLATFORM_ID
 } from '@angular/core';
 import { CommonModule, isPlatformBrowser, DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import type * as LType from 'leaflet';
 
 // Conditional import - only import Leaflet in browser
@@ -99,11 +100,14 @@ interface MapEvento extends Evento {
 @Component({
   selector: 'app-mapa',
   standalone: true,
-  imports: [CommonModule, DatePipe],
+  imports: [CommonModule, DatePipe, RouterLink],
   template: `
     <div class="wrap">
       <header class="topbar">
         <div class="title">🗺️ 🛡️ Sistema Integrador </div>
+        <div class="actions">
+          <a routerLink="/mapeamento" class="btn-link">⚙️ Mapeamento</a>
+        </div>
       </header>
 
       <!-- Sidebar de eventos -->
@@ -145,6 +149,15 @@ interface MapEvento extends Evento {
       display:flex; align-items:center; justify-content:space-between; gap:12px;
     }
     .title { font-weight:700; }
+    .actions { display:flex; align-items:center; gap:8px; }
+    .btn-link {
+      padding:6px 12px; border-radius:8px; 
+      text-decoration:none; color:#fff; 
+      background:#475569; 
+      font-size:0.9rem;
+      transition:background 0.2s;
+    }
+    .btn-link:hover { background:#64748b; }
 
     .map { flex:1 1 auto; width:100%; }
 

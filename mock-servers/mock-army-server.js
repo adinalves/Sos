@@ -9,57 +9,57 @@ const http = require('http');
 const TARGET_HOST = 'localhost';
 const TARGET_PORT = 4000;
 const TARGET_PATH = '/api/eventos/army';
-const INTERVAL_MS = 3000; // Send event every 3 seconds
+const INTERVAL_MS = 30000; // Send event every 30 seconds
 
 // Event templates for Army
 const eventTemplates = [
   {
-    nome: 'Ponto de observação',
-    descricao: 'Unidade do EB estabelece ponto de observação estratégico para monitoramento da área.',
-    latitude: -22.9068,
-    longitude: -43.1729
+    titulo: 'Ponto de observação',
+    detalhes: 'Unidade do EB estabelece ponto de observação estratégico para monitoramento da área.',
+    lat: -22.9068,
+    lng: -43.1729
   },
   {
-    nome: 'Patrulha motorizada',
-    descricao: 'Patrulha motorizada realiza deslocamento para presença dissuasória em áreas sensíveis.',
-    latitude: -22.9100,
-    longitude: -43.1800
+    titulo: 'Patrulha motorizada',
+    detalhes: 'Patrulha motorizada realiza deslocamento para presença dissuasória em áreas sensíveis.',
+    lat: -22.9100,
+    lng: -43.1800
   },
   {
-    nome: 'Posto de apoio avançado',
-    descricao: 'Posto de apoio avançado montado para suporte logístico às tropas em operação.',
-    latitude: -22.9000,
-    longitude: -43.1700
+    titulo: 'Posto de apoio avançado',
+    detalhes: 'Posto de apoio avançado montado para suporte logístico às tropas em operação.',
+    lat: -22.9000,
+    lng: -43.1700
   },
   {
-    nome: 'Comboio logístico',
-    descricao: 'Comboio logístico em trânsito com suprimentos para base operacional.',
-    latitude: -22.9200,
-    longitude: -43.1750
+    titulo: 'Comboio logístico',
+    detalhes: 'Comboio logístico em trânsito com suprimentos para base operacional.',
+    lat: -22.9200,
+    lng: -43.1750
   },
   {
-    nome: 'Operação conjunta',
-    descricao: 'Ação coordenada com forças de segurança locais em operação conjunta.',
-    latitude: -22.9150,
-    longitude: -43.1650
+    titulo: 'Operação conjunta',
+    detalhes: 'Ação coordenada com forças de segurança locais em operação conjunta.',
+    lat: -22.9150,
+    lng: -43.1650
   },
   {
-    nome: 'Reconhecimento de área',
-    descricao: 'Reconhecimento tático de terreno urbano para futura operação.',
-    latitude: -22.9050,
-    longitude: -43.1850
+    titulo: 'Reconhecimento de área',
+    detalhes: 'Reconhecimento tático de terreno urbano para futura operação.',
+    lat: -22.9050,
+    lng: -43.1850
   },
   {
-    nome: 'Ponto de controle de acesso',
-    descricao: 'Ponto de controle instalado para fiscalização de entrada e saída de veículos.',
-    latitude: -22.9250,
-    longitude: -43.1600
+    titulo: 'Ponto de controle de acesso',
+    detalhes: 'Ponto de controle instalado para fiscalização de entrada e saída de veículos.',
+    lat: -22.9250,
+    lng: -43.1600
   },
   {
-    nome: 'Deslocamento tático',
-    descricao: 'Deslocamento de frações em formação tática para reforço de posição avançada.',
-    latitude: -22.8950,
-    longitude: -43.1750
+    titulo: 'Deslocamento tático',
+    detalhes: 'Deslocamento de frações em formação tática para reforço de posição avançada.',
+    lat: -22.8950,
+    lng: -43.1750
   }
 ];
 
@@ -67,19 +67,25 @@ const eventTemplates = [
 function generateEvent() {
   const template = eventTemplates[Math.floor(Math.random() * eventTemplates.length)];
   const variation = 0.01; // Small variation in coordinates
+  const identificador = 'ARMY-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
   
   return {
-    nome: template.nome,
-    descricao: template.descricao,
-    latitude: template.latitude + (Math.random() - 0.5) * variation,
-    longitude: template.longitude + (Math.random() - 0.5) * variation
+    identificador: identificador,
+    titulo: template.titulo,
+    detalhes: template.detalhes,
+    lat: template.lat + (Math.random() - 0.5) * variation,
+    lng: template.lng + (Math.random() - 0.5) * variation,
+    dataHora: new Date().toISOString()
   };
 }
 
 // Send event to main server
 function sendEvent() {
   const event = generateEvent();
-  const data = JSON.stringify(event);
+  const data = JSON.stringify(event, null, 2);
+
+  console.log(`[ARMY] Sending event (JSON):`);
+  console.log(JSON.stringify(event, null, 2));
 
   const options = {
     hostname: TARGET_HOST,
@@ -101,9 +107,9 @@ function sendEvent() {
 
     res.on('end', () => {
       if (res.statusCode === 201) {
-        console.log(`[ARMY] Event sent successfully: ${event.nome} at ${event.latitude.toFixed(5)}, ${event.longitude.toFixed(5)}`);
+        console.log(`[ARMY] ✓ Event sent successfully: ${event.titulo} at ${event.lat.toFixed(5)}, ${event.lng.toFixed(5)}`);
       } else {
-        console.error(`[ARMY] Error sending event: ${res.statusCode} - ${responseData}`);
+        console.error(`[ARMY] ✗ Error sending event: ${res.statusCode} - ${responseData}`);
       }
     });
   });
