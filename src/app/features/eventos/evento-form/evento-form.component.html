@@ -2,22 +2,38 @@
   <h2>{{ titulo }}</h2>
 
   <form (ngSubmit)="salvar()">
-    <label>Nome
+    <label>
+      Nome
       <input [(ngModel)]="model.nome" name="nome" required />
     </label>
 
-    <label>Descrição
+    <label>
+      Descrição
       <textarea [(ngModel)]="model.descricao" name="descricao"></textarea>
     </label>
 
-    <label>Latitude
+    <label>
+      Força
+      <select [(ngModel)]="model.forca" name="forca">
+        <option [ngValue]="undefined">Selecione...</option>
+        <option [ngValue]="'PMERJ'">PMERJ</option>
+        <option [ngValue]="'EB'">Exército Brasileiro</option>
+      </select>
+    </label>
+
+    <label>
+      Latitude
       <input type="number" step="any" [(ngModel)]="model.latitude" name="latitude" required />
     </label>
 
-    <label>Longitude
+    <label>
+      Longitude
       <input type="number" step="any" [(ngModel)]="model.longitude" name="longitude" required />
     </label>
 
-    <button type="submit">Salvar</button>
+    <div class="form-actions">
+      <button type="submit">Salvar</button>
+      <button type="button" (click)="cancelar()">Cancelar</button>
+    </div>
   </form>
 </div>

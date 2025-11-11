@@ -4,34 +4,109 @@ import {
   Component,
   Inject,
   OnDestroy,
+  OnInit,
   PLATFORM_ID
 } from '@angular/core';
 import { CommonModule, isPlatformBrowser, DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import type * as LType from 'leaflet';
 
-type Forca = 'PMERJ' | 'EB';
+// Conditional import - only import Leaflet in browser
+let L: any = null;
 
-interface Evento {
-  id: string;
+async function loadLeaflet(): Promise<any> {
+  if (typeof window === 'undefined') {
+    throw new Error('Leaflet can only be loaded in browser');
+  }
+  
+  if (L) {
+    return L; // Already loaded
+  }
+  
+  // Use dynamic import with explicit handling
+  const leafletModule: any = await import('leaflet');
+  
+  // Debug: log the module structure
+  console.log('Leaflet module:', leafletModule);
+  console.log('Module keys:', Object.keys(leafletModule));
+  console.log('Has default:', !!leafletModule.default);
+  console.log('Default type:', typeof leafletModule.default);
+  if (leafletModule.default) {
+    console.log('Default keys:', Object.keys(leafletModule.default));
+    console.log('Default has map:', typeof leafletModule.default.map);
+  }
+  console.log('Module has map:', typeof leafletModule.map);
+  console.log('Module type:', typeof leafletModule);
+  
+  // Try to get Leaflet namespace
+  // Leaflet 1.9.4 exports as a namespace, so we need to access it correctly
+  if (leafletModule && typeof leafletModule.map === 'function') {
+    L = leafletModule;
+    console.log('Using leafletModule directly');
+  } else if (leafletModule.default) {
+    // Check if default is the Leaflet object or a wrapper
+    if (typeof leafletModule.default.map === 'function') {
+      L = leafletModule.default;
+      console.log('Using leafletModule.default');
+    } else if (leafletModule.default.default && typeof leafletModule.default.default.map === 'function') {
+      L = leafletModule.default.default;
+      console.log('Using leafletModule.default.default');
+    } else {
+      // Try to find map in default's properties
+      for (const key in leafletModule.default) {
+        const value = leafletModule.default[key];
+        if (value && typeof value === 'object' && typeof value.map === 'function') {
+          L = value;
+          console.log('Found Leaflet in default at key:', key);
+          break;
+        }
+      }
+    }
+  } else if (leafletModule.leaflet && typeof leafletModule.leaflet.map === 'function') {
+    L = leafletModule.leaflet;
+    console.log('Using leafletModule.leaflet');
+  } else {
+    // Last resort: try to find any property with map function
+    for (const key in leafletModule) {
+      const value = leafletModule[key];
+      if (value && typeof value === 'object' && typeof value.map === 'function') {
+        L = value;
+        console.log('Found Leaflet at key:', key);
+        break;
+      }
+    }
+  }
+  
+  if (!L || typeof L.map !== 'function') {
+    console.error('Failed to extract Leaflet from module');
+    console.error('Available properties:', Object.keys(leafletModule));
+    if (leafletModule.default) {
+      console.error('Default properties:', Object.keys(leafletModule.default));
+    }
+    throw new Error('Leaflet module structure is invalid');
+  }
+  
+  console.log('Leaflet loaded successfully, L.map is a function');
+  return L;
+}
+import { EventoService } from '../eventos/evento.service';
+import { Evento, Forca } from '../eventos/evento.model';
+
+interface MapEvento extends Evento {
   forca: Forca;
-  nome: string;
-  descricao: string;
-  latitude: number;
-  longitude: number;
   ts: number;
 }
 
 @Component({
   selector: 'app-mapa',
   standalone: true,
-  imports: [CommonModule, DatePipe],
+  imports: [CommonModule, DatePipe, RouterLink],
   template: `
     <div class="wrap">
       <header class="topbar">
         <div class="title">🗺️ 🛡️ Sistema Integrador </div>
         <div class="actions">
-          <button (click)="start()" [disabled]="running">Iniciar</button>
-          <button (click)="stop()" [disabled]="!running">Parar</button>
+          <a routerLink="/config" class="btn-config">⚙️ Configuração</a>
           <button (click)="clearAll()">Limpar</button>
         </div>
       </header>
@@ -75,8 +150,11 @@ interface Evento {
       display:flex; align-items:center; justify-content:space-between; gap:12px;
     }
     .title { font-weight:700; }
-    .actions button { margin-left:8px; padding:6px 10px; border-radius:8px; border:0; cursor:pointer; }
+    .actions { display:flex; align-items:center; gap:8px; }
+    .actions button, .actions a { margin-left:8px; padding:6px 10px; border-radius:8px; border:0; cursor:pointer; text-decoration:none; color:#fff; background:#475569; }
+    .actions button:hover, .actions a:hover { background:#64748b; }
     .actions button:disabled { opacity:.6; cursor:not-allowed; }
+    .btn-config { display:inline-block; }
 
     .map { flex:1 1 auto; width:100%; }
 
@@ -120,47 +198,111 @@ interface Evento {
     }
   `]
 })
-export class MapaComponent implements AfterViewInit, OnDestroy {
-  private L!: typeof LType;
+export class MapaComponent implements AfterViewInit, OnDestroy, OnInit {
+  private L: any = null;
   private map!: LType.Map;
   private pmLayer!: LType.LayerGroup;
   private ebLayer!: LType.LayerGroup;
   private legend!: LType.Control;
-  private timerId: any = null;
-  running = false;
 
   private readonly center: [number, number] = [-22.9068, -43.1729]; // Rio de Janeiro
 
   // lista exibida na sidebar + índice de marcador por id
-  events: Evento[] = [];
+  events: MapEvento[] = [];
   private markerById = new Map<string, LType.Layer>();
+  private eventSubscription: any;
 
-  // polígono aproximado do Rio (lng, lat) — evita pontos no mar
-  private rioPolygon: [number, number][] = [
-    [-43.7965, -22.9212],
-    [-43.7700, -22.9920],
-    [-43.7150, -23.0230],
-    [-43.5100, -23.0300],
-    [-43.1400, -22.9800],
-    [-43.1200, -22.9000],
-    [-43.1800, -22.8200],
-    [-43.3300, -22.7700],
-    [-43.6000, -22.7700],
-    [-43.7965, -22.9212]
-  ];
+  constructor(
+    @Inject(PLATFORM_ID) private platformId: Object,
+    private eventoService: EventoService
+  ) {}
 
-  constructor(@Inject(PLATFORM_ID) private platformId: Object) {}
+
+  ngOnInit() {
+    // Only subscribe to events in browser, not during SSR
+    if (isPlatformBrowser(this.platformId)) {
+      console.log('MapaComponent.ngOnInit: Browser detected, will subscribe to events');
+      // Use setTimeout to ensure this runs after hydration
+      setTimeout(() => {
+        console.log('MapaComponent: Subscribing to eventos...');
+        this.eventSubscription = this.eventoService.list().subscribe({
+          next: (events) => {
+            console.log('MapaComponent: Received events from service:', events.length, events);
+            if (events.length === 0) {
+              console.warn('MapaComponent: Received empty events array');
+            }
+            // Filter events that have required fields for map display
+            // Events need: forca, latitude, longitude, and optionally ts
+            const filtered = events.filter(e => {
+              const hasRequired = e.forca && 
+                                 typeof e.latitude === 'number' && 
+                                 typeof e.longitude === 'number';
+              if (!hasRequired) {
+                console.warn('Event filtered out (missing required fields):', e);
+              }
+              return hasRequired;
+            }).map(e => ({
+              ...e,
+              ts: e.ts || Date.now() // Use current time if ts is missing
+            })) as MapEvento[];
+            console.log('MapaComponent: Filtered events:', filtered.length, 'out of', events.length);
+            this.updateEvents(filtered);
+          },
+          error: (error) => {
+            console.error('MapaComponent: Error in eventos subscription:', error);
+          },
+          complete: () => {
+            console.log('MapaComponent: Subscription completed');
+          }
+        });
+      }, 100); // Increased timeout to ensure everything is ready
+    } else {
+      console.log('MapaComponent.ngOnInit: SSR mode, skipping subscription');
+    }
+  }
 
   async ngAfterViewInit() {
     if (!isPlatformBrowser(this.platformId)) return;
 
-    this.L = await import('leaflet');
+    // Ensure DOM is ready
+    await new Promise(resolve => setTimeout(resolve, 0));
 
-    // Ícones padrão do Leaflet (se você usar Marker padrão)
-    const iconRetinaUrl = (await import('leaflet/dist/images/marker-icon-2x.png?url')).default;
-    const iconUrl       = (await import('leaflet/dist/images/marker-icon.png?url')).default;
-    const shadowUrl     = (await import('leaflet/dist/images/marker-shadow.png?url')).default;
-    this.L.Icon.Default.mergeOptions({ iconRetinaUrl, iconUrl, shadowUrl });
+    // Verify map container exists
+    const mapElement = document.getElementById('map');
+    if (!mapElement) {
+      console.error('Map container element not found');
+      return;
+    }
+
+    try {
+      this.L = await loadLeaflet();
+      
+      // Final validation
+      if (!this.L) {
+        console.error('Leaflet is null');
+        return;
+      }
+      
+      if (typeof this.L.map !== 'function') {
+        console.error('L.map is not a function. L object:', this.L);
+        console.error('L type:', typeof this.L);
+        console.error('L keys:', this.L ? Object.keys(this.L) : 'null');
+        return;
+      }
+      
+      console.log('Leaflet loaded successfully, L.map is a function');
+    } catch (error) {
+      console.error('Failed to load Leaflet:', error);
+      return;
+    }
+
+    // Note: We use circleMarker instead of default markers, so icon configuration is not needed
+    // If you need to use default markers in the future, uncomment and configure:
+    // this.L.Icon.Default.mergeOptions({
+    //   iconRetinaUrl: '/leaflet/marker-icon-2x.png',
+    //   iconUrl: '/leaflet/marker-icon.png',
+    //   shadowUrl: '/leaflet/marker-shadow.png'
+    // });
 
     // Mapa
     this.map = this.L.map('map', { center: this.center, zoom: 12, zoomControl: true });
@@ -182,25 +324,23 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
 
     // Legenda
     this.addLegend();
-
-    // Inicia simulação
-    this.start();
+    
+    console.log('Map fully initialized. pmLayer:', !!this.pmLayer, 'ebLayer:', !!this.ebLayer);
+    
+    // If we already have events stored (from before map was ready), add them now
+    if (this.events.length > 0) {
+      console.log('Map initialized, adding', this.events.length, 'stored events to map');
+      // Use updateEvents to properly add all events
+      this.updateEvents(this.events);
+    } else {
+      console.log('No events stored yet, will be added when received from service');
+    }
   }
 
-  ngOnDestroy() { this.stop(); }
-
-  // controles
-  start() {
-    if (this.running) return;
-    this.running = true;
-
-    for (let i = 0; i < 5; i++) this.addRandomPoint();
-    this.timerId = setInterval(() => this.addRandomPoint(), 1500);
-  }
-
-  stop() {
-    this.running = false;
-    if (this.timerId) { clearInterval(this.timerId); this.timerId = null; }
+  ngOnDestroy() {
+    if (this.eventSubscription) {
+      this.eventSubscription.unsubscribe();
+    }
   }
 
   clearAll() {
@@ -210,27 +350,132 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
     this.events = [];
   }
 
-  // cria ponto e atualiza lista
-  private addRandomPoint() {
-    const forca: Forca = Math.random() < 0.5 ? 'PMERJ' : 'EB';
-    const e = this.fakeEvento(forca);
+  // Update events from service
+  private updateEvents(newEvents: MapEvento[]) {
+    console.log('updateEvents called with', newEvents.length, 'events');
+    console.log('L exists:', !!this.L, 'map exists:', !!this.map);
+    console.log('pmLayer exists:', !!this.pmLayer, 'ebLayer exists:', !!this.ebLayer);
+    
+    // Always update the events list for the sidebar, even if map is not ready
+    this.events = [...newEvents].sort((a, b) => b.ts - a.ts).slice(0, 200);
+    console.log('Events list updated for sidebar, total:', this.events.length);
+    
+    if (!this.L || !this.map) {
+      console.warn('Cannot add events to map: L or map not initialized. Events stored for later.');
+      return;
+    }
 
-    const color = forca === 'PMERJ' ? '#1565c0' : '#2e7d32';
-    const marker = this.L.circleMarker([e.latitude, e.longitude], {
-      radius: 7, color, weight: 2, fillColor: color, fillOpacity: 0.85
-    }).bindPopup(
-      `<b>${e.forca}</b><br>${e.nome}<br>${e.descricao}<br><small>${new Date(e.ts).toLocaleString()}</small>`
-    );
+    if (!this.pmLayer || !this.ebLayer) {
+      console.warn('Cannot add events to map: layers not initialized. Events stored for later.');
+      return;
+    }
 
-    if (forca === 'PMERJ') marker.addTo(this.pmLayer); else marker.addTo(this.ebLayer);
-    this.markerById.set(e.id, marker);
+    // Create a set of existing event IDs from markers already on map
+    const existingIds = new Set(Array.from(this.markerById.keys()));
+    
+    // Find new events that need to be added
+    const eventsToAdd = newEvents.filter(e => !existingIds.has(e.id));
+    console.log('Existing markers on map:', existingIds.size);
+    console.log('New events to add:', eventsToAdd.length, eventsToAdd);
+    
+    // Remove markers for events that no longer exist
+    const currentIds = new Set(newEvents.map(e => e.id));
+    const eventsToRemove: string[] = [];
+    this.markerById.forEach((marker, eventId) => {
+      if (!currentIds.has(eventId)) {
+        eventsToRemove.push(eventId);
+      }
+    });
+    
+    eventsToRemove.forEach(eventId => {
+      const marker = this.markerById.get(eventId);
+      if (marker) {
+        const event = this.events.find(e => e.id === eventId);
+        if (event) {
+          if (event.forca === 'PMERJ') {
+            this.pmLayer.removeLayer(marker);
+          } else {
+            this.ebLayer.removeLayer(marker);
+          }
+        }
+        this.markerById.delete(eventId);
+        console.log('Removed marker for event:', eventId);
+      }
+    });
 
-    // reatribui para disparar CD e mantém máx. 200
-    this.events = [e, ...this.events].slice(0, 200);
+    // Add new events to the map
+    console.log('Adding', eventsToAdd.length, 'new events to map');
+    eventsToAdd.forEach(event => {
+      console.log('Adding event to map:', event.id, event.nome, event.forca, [event.latitude, event.longitude]);
+      this.addEventToMap(event);
+    });
+    
+    // Log total markers after update
+    console.log('Total markers on map after update:', this.markerById.size);
+  }
+
+  // Add a single event to the map
+  private addEventToMap(event: MapEvento) {
+    if (!this.L || !this.map) {
+      console.warn('Cannot add event to map: L or map not initialized');
+      return;
+    }
+
+    if (!this.pmLayer || !this.ebLayer) {
+      console.warn('Cannot add event to map: layers not initialized');
+      return;
+    }
+
+    try {
+      const color = event.forca === 'PMERJ' ? '#1565c0' : '#2e7d32';
+      const position: [number, number] = [event.latitude, event.longitude];
+      
+      console.log('Creating circleMarker at:', position, 'with color:', color);
+      
+      const marker = this.L.circleMarker(position, {
+        radius: 7,
+        color: color,
+        weight: 2,
+        fillColor: color,
+        fillOpacity: 0.85
+      });
+      
+      marker.bindPopup(
+        `<b>${event.forca}</b><br>${event.nome}<br>${event.descricao}<br><small>${new Date(event.ts).toLocaleString()}</small>`
+      );
+
+      const targetLayer = event.forca === 'PMERJ' ? this.pmLayer : this.ebLayer;
+      marker.addTo(targetLayer);
+      this.markerById.set(event.id, marker);
+      
+      console.log('Marker added successfully to', event.forca, 'layer. Total markers:', this.markerById.size);
+      
+      // Verify marker is actually on the map
+      if (targetLayer.hasLayer(marker)) {
+        console.log('Marker confirmed on layer');
+        // Get marker bounds and ensure map view includes it
+        const bounds = marker.getBounds ? marker.getBounds() : null;
+        if (bounds) {
+          console.log('Marker bounds:', bounds);
+        }
+      } else {
+        console.error('Marker was not added to layer!');
+      }
+      
+      // Force map to invalidate size in case of rendering issues
+      setTimeout(() => {
+        if (this.map) {
+          this.map.invalidateSize();
+        }
+      }, 100);
+    } catch (error) {
+      console.error('Error adding event to map:', error, event);
+    }
   }
 
   // clicar no item da sidebar → centraliza e abre popup
-  goTo(e: Evento) {
+  goTo(e: MapEvento) {
+    if (!this.map) return;
     this.map.flyTo([e.latitude, e.longitude], Math.max(this.map.getZoom(), 14), { duration: 0.8 });
     const layer = this.markerById.get(e.id);
     if (layer && 'openPopup' in (layer as any)) {
@@ -238,87 +483,8 @@ export class MapaComponent implements AfterViewInit, OnDestroy {
     }
   }
 
-  trackById(_: number, e: Evento) { return e.id; }
+  trackById(_: number, e: MapEvento) { return e.id; }
 
-  // geração fake, garantindo cair dentro do polígono (terra) com descrições realistas
-  private fakeEvento(forca: Forca): Evento {
-    let lat: number, lng: number;
-    do {
-      const [lat0, lng0] = this.center;
-      lat = lat0 + (Math.random() - 0.5) * 0.35;
-      lng = lng0 + (Math.random() - 0.5) * 0.35;
-    } while (!this.isInsidePolygon(lat, lng));
-
-    const nomesPM = [
-      'Patrulhamento de rotina',
-      'Ocorrência em andamento',
-      'Fiscalização de trânsito',
-      'Abordagem de suspeitos',
-      'Operação de bloqueio',
-      'Ronda escolar',
-      'Monitoramento de aglomeração',
-      'Suporte a evento público'
-    ];
-    const descricoesPM = [
-      'Equipe da PMERJ realiza patrulhamento preventivo na região, com foco em dissuadir práticas criminosas.',
-      'Policiamento ostensivo em resposta a denúncia de atividade suspeita.',
-      'Fiscalização de veículos e motocicletas para coibir infrações e identificar irregularidades.',
-      'Abordagem de indivíduos em atitude suspeita para verificação de antecedentes.',
-      'Operação de bloqueio viário com revista aleatória de veículos.',
-      'Ronda escolar garantindo segurança no entorno de instituição de ensino.',
-      'Monitoramento de pontos de aglomeração para manter a ordem pública.',
-      'Atuação preventiva em apoio à realização de evento público.'
-    ];
-
-    const nomesEB = [
-      'Ponto de observação',
-      'Patrulha motorizada',
-      'Posto de apoio avançado',
-      'Comboio logístico',
-      'Operação conjunta',
-      'Reconhecimento de área',
-      'Ponto de controle de acesso',
-      'Deslocamento tático'
-    ];
-    const descricoesEB = [
-      'Unidade do EB estabelece ponto de observação estratégico para monitoramento da área.',
-      'Patrulha motorizada realiza deslocamento para presença dissuasória em áreas sensíveis.',
-      'Posto de apoio avançado montado para suporte logístico às tropas em operação.',
-      'Comboio logístico em trânsito com suprimentos para base operacional.',
-      'Ação coordenada com forças de segurança locais em operação conjunta.',
-      'Reconhecimento tático de terreno urbano para futura operação.',
-      'Ponto de controle instalado para fiscalização de entrada e saída de veículos.',
-      'Deslocamento de frações em formação tática para reforço de posição avançada.'
-    ];
-
-    let nome: string;
-    let descricao: string;
-
-    if (forca === 'PMERJ') {
-      const idx = Math.floor(Math.random() * nomesPM.length);
-      nome = nomesPM[idx];
-      descricao = descricoesPM[idx];
-    } else {
-      const idx = Math.floor(Math.random() * nomesEB.length);
-      nome = nomesEB[idx];
-      descricao = descricoesEB[idx];
-    }
-
-    return { id: crypto.randomUUID(), forca, nome, descricao, latitude: lat, longitude: lng, ts: Date.now() };
-  }
-
-  // point-in-polygon (ray casting)
-  private isInsidePolygon(lat: number, lng: number): boolean {
-    let inside = false;
-    const x = lng, y = lat, poly = this.rioPolygon;
-    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
-      const xi = poly[i][0], yi = poly[i][1];
-      const xj = poly[j][0], yj = poly[j][1];
-      const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-      if (intersect) inside = !inside;
-    }
-    return inside;
-  }
 
   // legenda customizada
   private addLegend() {

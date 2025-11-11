@@ -7,7 +7,9 @@
     "build": "ng build",
     "watch": "ng build --watch --configuration development",
     "test": "ng test",
-    "serve:ssr:eventos-mapa": "node dist/eventos-mapa/server/server.mjs"
+    "serve:ssr:eventos-mapa": "node dist/eventos-mapa/server/server.mjs",
+    "mock:army": "node mock-servers/mock-army-server.js",
+    "mock:pmerj": "node mock-servers/mock-pmerj-server.js"
   },
   "prettier": {
     "printWidth": 100,

@@ -1,0 +1,65 @@
+<div class="config-container">
+  <div class="config-card">
+    <h2>Configuração de Servidores</h2>
+    <p class="description">Configure os endereços IP dos servidores externos que enviam eventos para o sistema.</p>
+
+    <form (ngSubmit)="save()" #configForm="ngForm">
+      <div class="form-group">
+        <label for="ipArmy">
+          <strong>IP do Servidor do Exército (EB)</strong>
+          <span class="label-hint">Endereço IP ou hostname do servidor do Exército Brasileiro</span>
+        </label>
+        <input
+          type="text"
+          id="ipArmy"
+          name="ipArmy"
+          [(ngModel)]="config.ipArmy"
+          required
+          placeholder="ip_army"
+          class="form-control"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="ipPMERJ">
+          <strong>IP do Servidor da PMERJ</strong>
+          <span class="label-hint">Endereço IP ou hostname do servidor da Polícia Militar do Estado do Rio de Janeiro</span>
+        </label>
+        <input
+          type="text"
+          id="ipPMERJ"
+          name="ipPMERJ"
+          [(ngModel)]="config.ipPMERJ"
+          required
+          placeholder="ip_pmerj"
+          class="form-control"
+        />
+      </div>
+
+      <div class="message" *ngIf="message" [class.success]="messageType === 'success'" [class.error]="messageType === 'error'">
+        {{ message }}
+      </div>
+
+      <div class="actions">
+        <button type="button" (click)="cancel()" class="btn btn-secondary" [disabled]="loading">
+          Cancelar
+        </button>
+        <button type="submit" class="btn btn-primary" [disabled]="loading || !configForm.valid">
+          <span *ngIf="loading">Salvando...</span>
+          <span *ngIf="!loading">Salvar Configuração</span>
+        </button>
+      </div>
+    </form>
+
+    <div class="info-box">
+      <h3>Informações</h3>
+      <ul>
+        <li>Os servidores externos devem enviar eventos via POST para os endpoints:</li>
+        <li><strong>Exército:</strong> <code>POST /api/eventos/army</code></li>
+        <li><strong>PMERJ:</strong> <code>POST /api/eventos/pmerj</code></li>
+        <li>Os eventos devem conter os campos: <code>nome</code>, <code>latitude</code>, <code>longitude</code> e opcionalmente <code>descricao</code>.</li>
+      </ul>
+    </div>
+  </div>
+</div>
+

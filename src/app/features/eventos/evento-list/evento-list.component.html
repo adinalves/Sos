@@ -1,14 +1,26 @@
 <div class="container">
   <header>
-    <h2>Eventos</h2>
+    <h2>Eventos ({{ (eventos$ | async)?.length || 0 }})</h2>
     <a routerLink="/eventos/novo">Novo</a>
   </header>
 
+  <div *ngIf="(eventos$ | async)?.length === 0" class="empty-state">
+    <p>Nenhum evento encontrado.</p>
+  </div>
+
   <ul>
-    <li *ngFor="let e of (eventos$ | async)">
-      <strong>{{ e.nome }}</strong>
-      <div>{{ e.descricao }}</div>
-      <small>{{ e.latitude }}, {{ e.longitude }}</small>
+    <li *ngFor="let e of (eventos$ | async); trackBy: trackById">
+      <div class="event-header">
+        <strong>{{ e.nome }}</strong>
+        <span *ngIf="e.forca" class="tag" [class.pm]="e.forca==='PMERJ'" [class.eb]="e.forca==='EB'">
+          {{ e.forca }}
+        </span>
+      </div>
+      <div class="event-desc">{{ e.descricao }}</div>
+      <div class="event-meta">
+        <small>📍 {{ e.latitude.toFixed(5) }}, {{ e.longitude.toFixed(5) }}</small>
+        <small *ngIf="e.ts">• {{ e.ts | date:'short' }}</small>
+      </div>
       <div class="acoes">
         <a [routerLink]="['/eventos', e.id]">Editar</a>
         <button (click)="remover(e.id)">Remover</button>
