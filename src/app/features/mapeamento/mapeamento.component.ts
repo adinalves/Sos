@@ -18,7 +18,7 @@ import { MapeamentoConfig, DEFAULT_MAPPING } from './mapeamento.model';
 
       <div class="content">
         <div class="card">
-          <h2>🛡️ Exército Brasileiro (ARMY)</h2>
+          <h2>🛡️ Exército Brasileiro </h2>
           <p class="description">Configure o mapeamento dos campos recebidos do servidor ARMY</p>
           
           <div class="section-title">Mapeamento de Campos</div>
