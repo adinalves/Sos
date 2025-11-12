@@ -5,6 +5,42 @@
 
 const http = require('http');
 
+// Store logs in memory (last 1000 lines)
+const logs = [];
+const MAX_LOGS = 1000;
+
+// Override console methods to capture logs (must be done early)
+const originalLog = console.log;
+const originalError = console.error;
+const originalWarn = console.warn;
+
+function addLog(level, ...args) {
+  const timestamp = new Date().toISOString();
+  const message = args.map(arg => 
+    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+  ).join(' ');
+  const logLine = `[${timestamp}] [${level}] ${message}`;
+  logs.push(logLine);
+  if (logs.length > MAX_LOGS) {
+    logs.shift();
+  }
+}
+
+console.log = (...args) => {
+  addLog('INFO', ...args);
+  originalLog.apply(console, args);
+};
+
+console.error = (...args) => {
+  addLog('ERROR', ...args);
+  originalError.apply(console, args);
+};
+
+console.warn = (...args) => {
+  addLog('WARN', ...args);
+  originalWarn.apply(console, args);
+};
+
 // Configuration
 const TARGET_HOST = 'localhost';
 const TARGET_PORT = 4000;
@@ -234,11 +270,40 @@ checkServerAvailability((available) => {
   }
 });
 
+// HTTP server to expose logs
+const LOGS_PORT = 3002;
+const logsServer = http.createServer((req, res) => {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  
+  if (req.method === 'OPTIONS') {
+    res.writeHead(200);
+    res.end();
+    return;
+  }
+  
+  if (req.url === '/api/logs' && req.method === 'GET') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(logs));
+  } else {
+    res.writeHead(404, { 'Content-Type': 'text/plain' });
+    res.end('Not Found');
+  }
+});
+
+logsServer.listen(LOGS_PORT, () => {
+  console.log(`[PMERJ] Logs API server listening on http://localhost:${LOGS_PORT}/api/logs`);
+});
+
 // Handle graceful shutdown
 process.on('SIGINT', () => {
   console.log('\n[PMERJ] Shutting down...');
   if (intervalId) {
     clearInterval(intervalId);
   }
-  process.exit(0);
+  logsServer.close(() => {
+    process.exit(0);
+  });
 });

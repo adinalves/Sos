@@ -424,9 +424,50 @@ app.use('/api', (req, res, next) => {
   }
 });
 
+// Store logs in memory (last 1000 lines)
+const serverLogs: string[] = [];
+const MAX_LOGS = 1000;
+
+// Override console methods to capture logs
+const originalLog = console.log;
+const originalError = console.error;
+const originalWarn = console.warn;
+
+function addLog(level: string, ...args: any[]) {
+  const timestamp = new Date().toISOString();
+  const message = args.map(arg => 
+    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+  ).join(' ');
+  const logLine = `[${timestamp}] [${level}] ${message}`;
+  serverLogs.push(logLine);
+  if (serverLogs.length > MAX_LOGS) {
+    serverLogs.shift();
+  }
+}
+
+console.log = (...args: any[]) => {
+  addLog('INFO', ...args);
+  originalLog.apply(console, args);
+};
+
+console.error = (...args: any[]) => {
+  addLog('ERROR', ...args);
+  originalError.apply(console, args);
+};
+
+console.warn = (...args: any[]) => {
+  addLog('WARN', ...args);
+  originalWarn.apply(console, args);
+};
+
 /**
  * API Routes
  */
+
+// Get server logs
+app.get('/api/logs', (req, res) => {
+  res.json(serverLogs);
+});
 
 // Get all events
 app.get('/api/eventos', (req, res) => {

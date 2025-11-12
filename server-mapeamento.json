@@ -10,7 +10,7 @@
     },
     "security": {
       "token": "army-secret-token-123",
-      "allowedIp": "127.0.0.2"
+      "allowedIp": "127.0.0.1"
     }
   },
   "pmerj": {

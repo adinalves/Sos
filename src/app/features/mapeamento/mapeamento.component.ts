@@ -272,7 +272,7 @@ import { MapeamentoConfig, DEFAULT_MAPPING } from './mapeamento.model';
 
       <div class="actions">
         <button type="button" (click)="reset()" class="btn btn-secondary">Restaurar Padrão</button>
-        <button type="button" (click)="cancel()" class="btn btn-secondary">Cancelar</button>
+        <button type="button" (click)="cancel()" class="btn btn-secondary">Voltar</button>
         <button type="button" (click)="save()" [disabled]="loading || !isValid()" class="btn btn-primary">
           {{ loading ? 'Salvando...' : 'Salvar Mapeamento' }}
         </button>

@@ -3,11 +3,13 @@ import { MapaComponent } from './features/mapa/mapa.component';
 import { EventoListComponent } from './features/eventos/evento-list/evento-list.component';
 import { EventoFormComponent } from './features/eventos/evento-form/evento-form.component';
 import { MapeamentoComponent } from './features/mapeamento/mapeamento.component';
+import { LogsComponent } from './features/logs/logs.component';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'mapa' },
   { path: 'mapa', component: MapaComponent },
   { path: 'mapeamento', component: MapeamentoComponent },
+  { path: 'logs', component: LogsComponent },
   { path: 'eventos', component: EventoListComponent },
   { path: 'eventos/novo', component: EventoFormComponent },
   { path: 'eventos/:id', component: EventoFormComponent },

@@ -107,6 +107,7 @@ interface MapEvento extends Evento {
         <div class="title">🗺️ 🛡️ Sistema Integrador </div>
         <div class="actions">
           <a routerLink="/mapeamento" class="btn-link">⚙️ Mapeamento</a>
+          <a routerLink="/logs" class="btn-link">📋 Logs</a>
         </div>
       </header>
 
