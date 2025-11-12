@@ -10,6 +10,12 @@ const TARGET_HOST = 'localhost';
 const TARGET_PORT = 4000;
 const TARGET_PATH = '/api/eventos/pmerj';
 const INTERVAL_MS = 30000; // Send event every 30 seconds
+const AUTH_TOKEN = process.env.PMERJ_TOKEN || 'pmerj-secret-token-456'; // Token from environment or default
+const CLIENT_IP = process.env.PMERJ_IP || '127.0.0.1'; // IP to use (for testing IP validation)
+
+console.log(`[PMERJ] Configuration:`);
+console.log(`[PMERJ]   AUTH_TOKEN: ${AUTH_TOKEN}`);
+console.log(`[PMERJ]   CLIENT_IP: ${CLIENT_IP}`);
 
 // Event templates for PMERJ
 const eventTemplates = [
@@ -94,7 +100,9 @@ function sendEvent() {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(data)
+      'Content-Length': Buffer.byteLength(data),
+      'Authorization': AUTH_TOKEN,
+      'X-Forwarded-For': CLIENT_IP // For IP validation testing
     }
   };
 
@@ -107,9 +115,11 @@ function sendEvent() {
 
     res.on('end', () => {
       if (res.statusCode === 201) {
+        hasSentSuccessfully = true;
         console.log(`[PMERJ] ✓ Event sent successfully: ${event.name} at ${event.lat.toFixed(5)}, ${event.lon.toFixed(5)}`);
       } else {
-        console.error(`[PMERJ] ✗ Error sending event: ${res.statusCode} - ${responseData}`);
+        // Don't log full error response for security reasons
+        console.error(`[PMERJ] ✗ Error sending event: ${res.statusCode} - Request rejected by server`);
       }
     });
   });
@@ -143,6 +153,7 @@ let connectionErrors = 0;
 let lastErrorTime = 0;
 const ERROR_THROTTLE_MS = 10000; // Only show error every 10 seconds
 let intervalId;
+let hasSentSuccessfully = false; // Track if we've successfully sent at least one event
 
 // Check if server is available before starting
 function checkServerAvailability(callback) {
@@ -151,27 +162,38 @@ function checkServerAvailability(callback) {
     port: TARGET_PORT,
     path: '/api/eventos',
     method: 'GET',
-    timeout: 3000
+    timeout: 5000 // Increased timeout to 5 seconds
   }, (res) => {
-    console.log(`[PMERJ] ✓ Server is available on ${TARGET_HOST}:${TARGET_PORT}`);
-    callback(true);
+    // Consume response data to avoid hanging
+    res.on('data', () => {});
+    res.on('end', () => {
+      console.log(`[PMERJ] ✓ Server is available on ${TARGET_HOST}:${TARGET_PORT}`);
+      callback(true);
+    });
   });
 
   testReq.on('error', (error) => {
-    console.error(`[PMERJ] ✗ Server is NOT available on ${TARGET_HOST}:${TARGET_PORT}`);
-    console.error(`[PMERJ] Error: ${error.code || error.message}`);
-    console.error(`[PMERJ]`);
-    console.error(`[PMERJ] Please start the SSR server first:`);
-    console.error(`[PMERJ]   1. npm run build`);
-    console.error(`[PMERJ]   2. npm run serve:ssr:eventos-mapa`);
-    console.error(`[PMERJ]`);
-    console.error(`[PMERJ] Waiting for server to become available...`);
+    // Only log if it's not a timeout (timeout is handled separately)
+    if (error.code !== 'ECONNRESET' && error.code !== 'ETIMEDOUT') {
+      console.error(`[PMERJ] ✗ Server is NOT available on ${TARGET_HOST}:${TARGET_PORT}`);
+      console.error(`[PMERJ] Error: ${error.code || error.message}`);
+      console.error(`[PMERJ]`);
+      console.error(`[PMERJ] Please start the SSR server first:`);
+      console.error(`[PMERJ]   1. npm run build`);
+      console.error(`[PMERJ]   2. npm run serve:ssr:eventos-mapa`);
+      console.error(`[PMERJ]`);
+      console.error(`[PMERJ] Waiting for server to become available...`);
+    }
     callback(false);
   });
 
   testReq.on('timeout', () => {
     testReq.destroy();
-    console.error(`[PMERJ] ✗ Connection timeout - server may not be running`);
+    // Only log timeout if we haven't already started sending events successfully
+    // This prevents spam when server is slow but working
+    if (connectionErrors === 0) {
+      console.error(`[PMERJ] ✗ Connection timeout - server may not be running`);
+    }
     callback(false);
   });
 
@@ -192,17 +214,23 @@ checkServerAvailability((available) => {
     // Then send events at regular intervals
     intervalId = setInterval(sendEvent, INTERVAL_MS);
   } else {
-    // Retry connection every 5 seconds
+    // Retry connection every 10 seconds (less frequent to avoid spam)
     const retryInterval = setInterval(() => {
-      checkServerAvailability((available) => {
-        if (available) {
-          clearInterval(retryInterval);
-          console.log(`[PMERJ] Server is now available! Starting to send events...\n`);
-          sendEvent();
-          intervalId = setInterval(sendEvent, INTERVAL_MS);
-        }
-      });
-    }, 5000);
+      // Only check if we haven't sent successfully yet
+      if (!hasSentSuccessfully) {
+        checkServerAvailability((available) => {
+          if (available) {
+            clearInterval(retryInterval);
+            console.log(`[PMERJ] Server is now available! Starting to send events...\n`);
+            sendEvent();
+            intervalId = setInterval(sendEvent, INTERVAL_MS);
+          }
+        });
+      } else {
+        // If we've sent successfully, stop checking
+        clearInterval(retryInterval);
+      }
+    }, 10000);
   }
 });
 

@@ -10,6 +10,12 @@ const TARGET_HOST = 'localhost';
 const TARGET_PORT = 4000;
 const TARGET_PATH = '/api/eventos/army';
 const INTERVAL_MS = 30000; // Send event every 30 seconds
+const AUTH_TOKEN = process.env.ARMY_TOKEN || 'army-secret-token-123'; // Token from environment or default
+const CLIENT_IP = process.env.ARMY_IP || '127.0.0.1'; // IP to use (for testing IP validation)
+
+console.log(`[ARMY] Configuration:`);
+console.log(`[ARMY]   AUTH_TOKEN: ${AUTH_TOKEN}`);
+console.log(`[ARMY]   CLIENT_IP: ${CLIENT_IP}`);
 
 // Event templates for Army
 const eventTemplates = [
@@ -94,7 +100,9 @@ function sendEvent() {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(data)
+      'Content-Length': Buffer.byteLength(data),
+      'Authorization': AUTH_TOKEN,
+      'X-Forwarded-For': CLIENT_IP // For IP validation testing
     }
   };
 
@@ -107,9 +115,11 @@ function sendEvent() {
 
     res.on('end', () => {
       if (res.statusCode === 201) {
+        hasSentSuccessfully = true;
         console.log(`[ARMY] ✓ Event sent successfully: ${event.titulo} at ${event.lat.toFixed(5)}, ${event.lng.toFixed(5)}`);
       } else {
-        console.error(`[ARMY] ✗ Error sending event: ${res.statusCode} - ${responseData}`);
+        // Don't log full error response for security reasons
+        console.error(`[ARMY] ✗ Error sending event: ${res.statusCode} - Request rejected by server`);
       }
     });
   });
@@ -143,6 +153,7 @@ let connectionErrors = 0;
 let lastErrorTime = 0;
 const ERROR_THROTTLE_MS = 10000; // Only show error every 10 seconds
 let intervalId;
+let hasSentSuccessfully = false; // Track if we've successfully sent at least one event
 
 // Check if server is available before starting
 function checkServerAvailability(callback) {
@@ -151,27 +162,38 @@ function checkServerAvailability(callback) {
     port: TARGET_PORT,
     path: '/api/eventos',
     method: 'GET',
-    timeout: 3000
+    timeout: 5000 // Increased timeout to 5 seconds
   }, (res) => {
-    console.log(`[ARMY] ✓ Server is available on ${TARGET_HOST}:${TARGET_PORT}`);
-    callback(true);
+    // Consume response data to avoid hanging
+    res.on('data', () => {});
+    res.on('end', () => {
+      console.log(`[ARMY] ✓ Server is available on ${TARGET_HOST}:${TARGET_PORT}`);
+      callback(true);
+    });
   });
 
   testReq.on('error', (error) => {
-    console.error(`[ARMY] ✗ Server is NOT available on ${TARGET_HOST}:${TARGET_PORT}`);
-    console.error(`[ARMY] Error: ${error.code || error.message}`);
-    console.error(`[ARMY]`);
-    console.error(`[ARMY] Please start the SSR server first:`);
-    console.error(`[ARMY]   1. npm run build`);
-    console.error(`[ARMY]   2. npm run serve:ssr:eventos-mapa`);
-    console.error(`[ARMY]`);
-    console.error(`[ARMY] Waiting for server to become available...`);
+    // Only log if it's not a timeout (timeout is handled separately)
+    if (error.code !== 'ECONNRESET' && error.code !== 'ETIMEDOUT') {
+      console.error(`[ARMY] ✗ Server is NOT available on ${TARGET_HOST}:${TARGET_PORT}`);
+      console.error(`[ARMY] Error: ${error.code || error.message}`);
+      console.error(`[ARMY]`);
+      console.error(`[ARMY] Please start the SSR server first:`);
+      console.error(`[ARMY]   1. npm run build`);
+      console.error(`[ARMY]   2. npm run serve:ssr:eventos-mapa`);
+      console.error(`[ARMY]`);
+      console.error(`[ARMY] Waiting for server to become available...`);
+    }
     callback(false);
   });
 
   testReq.on('timeout', () => {
     testReq.destroy();
-    console.error(`[ARMY] ✗ Connection timeout - server may not be running`);
+    // Only log timeout if we haven't already started sending events successfully
+    // This prevents spam when server is slow but working
+    if (connectionErrors === 0) {
+      console.error(`[ARMY] ✗ Connection timeout - server may not be running`);
+    }
     callback(false);
   });
 
@@ -192,17 +214,23 @@ checkServerAvailability((available) => {
     // Then send events at regular intervals
     intervalId = setInterval(sendEvent, INTERVAL_MS);
   } else {
-    // Retry connection every 5 seconds
+    // Retry connection every 10 seconds (less frequent to avoid spam)
     const retryInterval = setInterval(() => {
-      checkServerAvailability((available) => {
-        if (available) {
-          clearInterval(retryInterval);
-          console.log(`[ARMY] Server is now available! Starting to send events...\n`);
-          sendEvent();
-          intervalId = setInterval(sendEvent, INTERVAL_MS);
-        }
-      });
-    }, 5000);
+      // Only check if we haven't sent successfully yet
+      if (!hasSentSuccessfully) {
+        checkServerAvailability((available) => {
+          if (available) {
+            clearInterval(retryInterval);
+            console.log(`[ARMY] Server is now available! Starting to send events...\n`);
+            sendEvent();
+            intervalId = setInterval(sendEvent, INTERVAL_MS);
+          }
+        });
+      } else {
+        // If we've sent successfully, stop checking
+        clearInterval(retryInterval);
+      }
+    }, 10000);
   }
 });
 

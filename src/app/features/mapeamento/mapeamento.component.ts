@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MapeamentoService } from './mapeamento.service';
-import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.model';
+import { MapeamentoConfig, DEFAULT_MAPPING } from './mapeamento.model';
 
 @Component({
   selector: 'app-mapeamento',
@@ -21,6 +21,7 @@ import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.mo
           <h2>🛡️ Exército Brasileiro (ARMY)</h2>
           <p class="description">Configure o mapeamento dos campos recebidos do servidor ARMY</p>
           
+          <div class="section-title">Mapeamento de Campos</div>
           <form class="mapping-form">
             <div class="field-group">
               <label>
@@ -28,7 +29,7 @@ import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.mo
                 <span class="field-hint">Campo do JSON que contém o identificador único. Deixe vazio para gerar automaticamente.</span>
                 <input 
                   type="text" 
-                  [(ngModel)]="config.army.id" 
+                  [(ngModel)]="config.army.mapping.id" 
                   name="army-id"
                   placeholder="Ex: identificador, id, codigo"
                   class="input"
@@ -42,7 +43,7 @@ import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.mo
                 <span class="field-hint">Campo do JSON que contém o nome do evento</span>
                 <input 
                   type="text" 
-                  [(ngModel)]="config.army.nome" 
+                  [(ngModel)]="config.army.mapping.nome" 
                   name="army-nome"
                   required
                   placeholder="Ex: nome, titulo, name"
@@ -57,7 +58,7 @@ import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.mo
                 <span class="field-hint">Campo do JSON que contém a descrição do evento</span>
                 <input 
                   type="text" 
-                  [(ngModel)]="config.army.descricao" 
+                  [(ngModel)]="config.army.mapping.descricao" 
                   name="army-descricao"
                   placeholder="Ex: descricao, description, detalhes"
                   class="input"
@@ -71,7 +72,7 @@ import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.mo
                 <span class="field-hint">Campo do JSON que contém a latitude</span>
                 <input 
                   type="text" 
-                  [(ngModel)]="config.army.latitude" 
+                  [(ngModel)]="config.army.mapping.latitude" 
                   name="army-latitude"
                   required
                   placeholder="Ex: latitude, lat, latitud"
@@ -86,7 +87,7 @@ import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.mo
                 <span class="field-hint">Campo do JSON que contém a longitude</span>
                 <input 
                   type="text" 
-                  [(ngModel)]="config.army.longitude" 
+                  [(ngModel)]="config.army.mapping.longitude" 
                   name="army-longitude"
                   required
                   placeholder="Ex: longitude, lng, long, longitud"
@@ -101,9 +102,40 @@ import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.mo
                 <span class="field-hint">Campo do JSON que contém o timestamp. Deixe vazio para usar o timestamp atual.</span>
                 <input 
                   type="text" 
-                  [(ngModel)]="config.army.ts" 
+                  [(ngModel)]="config.army.mapping.ts" 
                   name="army-ts"
                   placeholder="Ex: ts, timestamp, data, date"
+                  class="input"
+                />
+              </label>
+            </div>
+          </form>
+
+          <div class="section-title">Segurança</div>
+          <form class="mapping-form">
+            <div class="field-group">
+              <label>
+                <span class="field-label">Token de Autenticação (opcional)</span>
+                <span class="field-hint">Token que deve ser enviado no header 'Authorization'. Deixe vazio para desabilitar validação de token.</span>
+                <input 
+                  type="text" 
+                  [(ngModel)]="config.army.security.token" 
+                  name="army-token"
+                  placeholder="Ex: army-secret-token-123"
+                  class="input"
+                />
+              </label>
+            </div>
+
+            <div class="field-group">
+              <label>
+                <span class="field-label">IP Permitido (opcional)</span>
+                <span class="field-hint">IP que pode fazer requisições. Deixe vazio para permitir qualquer IP.</span>
+                <input 
+                  type="text" 
+                  [(ngModel)]="config.army.security.allowedIp" 
+                  name="army-ip"
+                  placeholder="Ex: 127.0.0.1, 192.168.1.100"
                   class="input"
                 />
               </label>
@@ -115,6 +147,7 @@ import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.mo
           <h2>🚔 PMERJ</h2>
           <p class="description">Configure o mapeamento dos campos recebidos do servidor PMERJ</p>
           
+          <div class="section-title">Mapeamento de Campos</div>
           <form class="mapping-form">
             <div class="field-group">
               <label>
@@ -122,7 +155,7 @@ import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.mo
                 <span class="field-hint">Campo do JSON que contém o identificador único. Deixe vazio para gerar automaticamente.</span>
                 <input 
                   type="text" 
-                  [(ngModel)]="config.pmerj.id" 
+                  [(ngModel)]="config.pmerj.mapping.id" 
                   name="pmerj-id"
                   placeholder="Ex: identificador, id, codigo"
                   class="input"
@@ -136,7 +169,7 @@ import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.mo
                 <span class="field-hint">Campo do JSON que contém o nome do evento</span>
                 <input 
                   type="text" 
-                  [(ngModel)]="config.pmerj.nome" 
+                  [(ngModel)]="config.pmerj.mapping.nome" 
                   name="pmerj-nome"
                   required
                   placeholder="Ex: nome, titulo, name"
@@ -151,7 +184,7 @@ import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.mo
                 <span class="field-hint">Campo do JSON que contém a descrição do evento</span>
                 <input 
                   type="text" 
-                  [(ngModel)]="config.pmerj.descricao" 
+                  [(ngModel)]="config.pmerj.mapping.descricao" 
                   name="pmerj-descricao"
                   placeholder="Ex: descricao, description, detalhes"
                   class="input"
@@ -165,7 +198,7 @@ import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.mo
                 <span class="field-hint">Campo do JSON que contém a latitude</span>
                 <input 
                   type="text" 
-                  [(ngModel)]="config.pmerj.latitude" 
+                  [(ngModel)]="config.pmerj.mapping.latitude" 
                   name="pmerj-latitude"
                   required
                   placeholder="Ex: latitude, lat, latitud"
@@ -180,7 +213,7 @@ import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.mo
                 <span class="field-hint">Campo do JSON que contém a longitude</span>
                 <input 
                   type="text" 
-                  [(ngModel)]="config.pmerj.longitude" 
+                  [(ngModel)]="config.pmerj.mapping.longitude" 
                   name="pmerj-longitude"
                   required
                   placeholder="Ex: longitude, lng, long, longitud"
@@ -195,9 +228,40 @@ import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.mo
                 <span class="field-hint">Campo do JSON que contém o timestamp. Deixe vazio para usar o timestamp atual.</span>
                 <input 
                   type="text" 
-                  [(ngModel)]="config.pmerj.ts" 
+                  [(ngModel)]="config.pmerj.mapping.ts" 
                   name="pmerj-ts"
                   placeholder="Ex: ts, timestamp, data, date"
+                  class="input"
+                />
+              </label>
+            </div>
+          </form>
+
+          <div class="section-title">Segurança</div>
+          <form class="mapping-form">
+            <div class="field-group">
+              <label>
+                <span class="field-label">Token de Autenticação (opcional)</span>
+                <span class="field-hint">Token que deve ser enviado no header 'Authorization'. Deixe vazio para desabilitar validação de token.</span>
+                <input 
+                  type="text" 
+                  [(ngModel)]="config.pmerj.security.token" 
+                  name="pmerj-token"
+                  placeholder="Ex: pmerj-secret-token-456"
+                  class="input"
+                />
+              </label>
+            </div>
+
+            <div class="field-group">
+              <label>
+                <span class="field-label">IP Permitido (opcional)</span>
+                <span class="field-hint">IP que pode fazer requisições. Deixe vazio para permitir qualquer IP.</span>
+                <input 
+                  type="text" 
+                  [(ngModel)]="config.pmerj.security.allowedIp" 
+                  name="pmerj-ip"
+                  placeholder="Ex: 127.0.0.1, 192.168.1.100"
                   class="input"
                 />
               </label>
@@ -276,6 +340,19 @@ import { MapeamentoConfig, FieldMapping, DEFAULT_MAPPING } from './mapeamento.mo
       color: #64748b;
       font-size: 0.9rem;
       margin: 0 0 20px 0;
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #0f172a;
+      margin: 24px 0 16px 0;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+
+    .section-title:first-of-type {
+      margin-top: 0;
     }
 
     .mapping-form {
@@ -400,13 +477,19 @@ export class MapeamentoComponent implements OnInit {
   ngOnInit() {
     // Use setTimeout to ensure this runs after hydration
     setTimeout(() => {
+      console.log('[COMPONENT] ngOnInit - Loading mapeamento from server...');
       this.mapeamentoService.getMapeamento().subscribe({
         next: (config) => {
+          console.log('[COMPONENT] ✓ Mapeamento loaded from server:', JSON.stringify(config, null, 2));
+          console.log('[COMPONENT] Army allowedIp loaded:', config.army.security.allowedIp);
+          console.log('[COMPONENT] PMERJ allowedIp loaded:', config.pmerj.security.allowedIp);
           this.config = config;
+          console.log('[COMPONENT] Config updated in component:', JSON.stringify(this.config, null, 2));
         },
         error: (error) => {
           // Se não existir configuração, usa a padrão
-          console.log('Usando configuração padrão:', error);
+          console.error('[COMPONENT] ✗ Error loading mapeamento:', error);
+          console.log('[COMPONENT] Using default configuration');
           this.config = { ...DEFAULT_MAPPING };
         }
       });
@@ -415,12 +498,12 @@ export class MapeamentoComponent implements OnInit {
 
   isValid(): boolean {
     return !!(
-      this.config.army.nome?.trim() &&
-      this.config.army.latitude?.trim() &&
-      this.config.army.longitude?.trim() &&
-      this.config.pmerj.nome?.trim() &&
-      this.config.pmerj.latitude?.trim() &&
-      this.config.pmerj.longitude?.trim()
+      this.config.army.mapping.nome?.trim() &&
+      this.config.army.mapping.latitude?.trim() &&
+      this.config.army.mapping.longitude?.trim() &&
+      this.config.pmerj.mapping.nome?.trim() &&
+      this.config.pmerj.mapping.latitude?.trim() &&
+      this.config.pmerj.mapping.longitude?.trim()
     );
   }
 
@@ -434,16 +517,39 @@ export class MapeamentoComponent implements OnInit {
     this.loading = true;
     this.message = '';
 
-    this.mapeamentoService.updateMapeamento(this.config).subscribe({
-      next: () => {
+    // Log detalhado do que está sendo enviado
+    console.log('[FRONTEND] ========================================');
+    console.log('[FRONTEND] SAVE - Current config object:');
+    console.log('[FRONTEND]   this.config:', this.config);
+    console.log('[FRONTEND]   this.config.army:', this.config.army);
+    console.log('[FRONTEND]   this.config.army.security:', this.config.army.security);
+    console.log('[FRONTEND]   this.config.army.security.allowedIp:', this.config.army.security.allowedIp);
+    console.log('[FRONTEND]   typeof this.config.army.security.allowedIp:', typeof this.config.army.security.allowedIp);
+    console.log('[FRONTEND] SAVE - JSON stringified:');
+    console.log(JSON.stringify(this.config, null, 2));
+    console.log('[FRONTEND] ========================================');
+
+    // Criar uma cópia profunda para garantir que não há referências compartilhadas
+    const configToSend = JSON.parse(JSON.stringify(this.config));
+    console.log('[FRONTEND] Config to send (deep copy):', JSON.stringify(configToSend, null, 2));
+    console.log('[FRONTEND] Army allowedIp in copy:', configToSend.army.security.allowedIp);
+
+    console.log('[COMPONENT] Calling updateMapeamento service...');
+    this.mapeamentoService.updateMapeamento(configToSend).subscribe({
+      next: (response) => {
+        console.log('[COMPONENT] ✓ Success callback - Response:', response);
         this.message = 'Mapeamento salvo com sucesso!';
         this.messageType = 'success';
         this.loading = false;
+        // Update local config with response
+        this.config = response;
         setTimeout(() => {
           this.message = '';
         }, 3000);
       },
       error: (error) => {
+        console.error('[COMPONENT] ✗ Error callback:', error);
+        console.error('[COMPONENT] Error details:', JSON.stringify(error, null, 2));
         this.message = 'Erro ao salvar mapeamento: ' + (error.message || 'Erro desconhecido');
         this.messageType = 'error';
         this.loading = false;
@@ -460,4 +566,3 @@ export class MapeamentoComponent implements OnInit {
     this.router.navigateByUrl('/mapa');
   }
 }
-
